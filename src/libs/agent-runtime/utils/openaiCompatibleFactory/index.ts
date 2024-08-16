@@ -162,6 +162,18 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
         }).producer();
       } else {
         console.warn('Token usage will not be reported to Upstash Kafka');
+        console.warn(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_URL}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]}`,
+        );
+        console.warn(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]}`,
+        );
+        console.warn(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]}`,
+        );
+        console.warn(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC]}`,
+        );
       }
       this.baseURL = this.client.baseURL;
     }
