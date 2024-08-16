@@ -95,15 +95,9 @@ function reportTokenUsageToKafka(user?: string, kafka_producer?: Producer) {
       controller.enqueue(chunk);
       if (chunk.usage !== null && kafka_producer !== null) {
         const kafka_topic = process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC];
-        if (kafka_topic === null) {
-          console.warn(
-            `Unable to report usage to Kafka as environment variable ${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC} is empty`,
-          );
-          return;
-        }
-        kafka_producer
-          ?.produce(kafka_topic!, { usage: chunk.usage, user: user })
-          .catch(console.error);
+        const kafka_message = { usage: chunk.usage, user: user };
+        console.log(`Producing usage message ${kafka_message} to Kafka topic ${kafka_topic}`);
+        kafka_producer?.produce(kafka_topic!, kafka_message).catch(console.error);
       }
     },
   });

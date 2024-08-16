@@ -155,6 +155,18 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
       this.client = new OpenAI({ apiKey, baseURL, ...constructorOptions, ...res });
       if (this.isKafkaConfigured()) {
         console.log('Token usage will be reported to Upstash Kafka');
+        console.log(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_URL}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]}`,
+        );
+        console.log(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]}`,
+        );
+        console.log(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]}`,
+        );
+        console.log(
+          `${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC]}`,
+        );
         this.kafka_producer = new Kafka({
           password: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]!,
           url: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]!,
