@@ -1,3 +1,4 @@
+import { Producer } from '@upstash/kafka';
 import { readableFromAsyncIterable } from 'ai';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -5,6 +6,7 @@ import type { Stream } from 'openai/streaming';
 import { ChatMessageError } from '@/types/message';
 
 import { ChatStreamCallbacks } from '../../types';
+import { ENV_VAR_TOKEN_STATS_KAFKA_TOPIC } from '../openaiCompatibleFactory';
 import {
   StreamProtocolChunk,
   StreamProtocolToolCallChunk,
@@ -87,6 +89,26 @@ export const transformOpenAIStream = (chunk: OpenAI.ChatCompletionChunk): Stream
   }
 };
 
+function reportTokenUsageToKafka(user?: string, kafka_producer?: Producer) {
+  return new TransformStream({
+    transform: (chunk, controller) => {
+      controller.enqueue(chunk);
+      if (chunk.usage !== null && kafka_producer !== null) {
+        const kafka_topic = process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC];
+        if (kafka_topic === null) {
+          console.warn(
+            `Unable to report usage to Kafka as environment variable ${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC} is empty`,
+          );
+          return;
+        }
+        kafka_producer
+          ?.produce(kafka_topic!, { usage: chunk.usage, user: user })
+          .catch(console.error);
+      }
+    },
+  });
+}
+
 const chatStreamable = async function* (stream: AsyncIterable<OpenAI.ChatCompletionChunk>) {
   for await (const response of stream) {
     yield response;
@@ -96,11 +118,14 @@ const chatStreamable = async function* (stream: AsyncIterable<OpenAI.ChatComplet
 export const OpenAIStream = (
   stream: Stream<OpenAI.ChatCompletionChunk> | ReadableStream,
   callbacks?: ChatStreamCallbacks,
+  user?: string,
+  kafka_producer?: Producer,
 ) => {
   const readableStream =
     stream instanceof ReadableStream ? stream : readableFromAsyncIterable(chatStreamable(stream));
 
   return readableStream
+    .pipeThrough(reportTokenUsageToKafka(user, kafka_producer))
     .pipeThrough(createSSEProtocolTransformer(transformOpenAIStream))
     .pipeThrough(createCallbacksTransformer(callbacks));
 };

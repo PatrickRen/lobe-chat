@@ -1,3 +1,4 @@
+import { Kafka, Producer } from '@upstash/kafka';
 import OpenAI, { ClientOptions } from 'openai';
 
 import { LOBE_DEFAULT_MODEL_LIST } from '@/config/modelProviders';
@@ -33,6 +34,11 @@ const CHAT_MODELS_BLOCK_LIST = [
   'whisper',
   'dall-e',
 ];
+
+const ENV_VAR_TOKEN_STATS_KAFKA_REST_URL = 'UPSTASH_KAFKA_REST_URL';
+const ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME = 'UPSTASH_KAFKA_REST_USERNAME';
+const ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD = 'UPSTASH_KAFKA_REST_PASSWORD';
+export const ENV_VAR_TOKEN_STATS_KAFKA_TOPIC = 'TOKEN_USAGE_TOPIC';
 
 type ConstructorOptions<T extends Record<string, any> = any> = ClientOptions & T;
 
@@ -134,6 +140,7 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
 
   return class LobeOpenAICompatibleAI implements LobeRuntimeAI {
     client: OpenAI;
+    kafka_producer?: Producer;
 
     baseURL: string;
     private _options: ConstructorOptions<T>;
@@ -146,6 +153,16 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
       if (!apiKey) throw AgentRuntimeError.createError(ErrorType?.invalidAPIKey);
 
       this.client = new OpenAI({ apiKey, baseURL, ...constructorOptions, ...res });
+      if (this.isKafkaConfigured()) {
+        console.log('Token usage will be reported to Upstash Kafka');
+        this.kafka_producer = new Kafka({
+          password: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]!,
+          url: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]!,
+          username: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]!,
+        }).producer();
+      } else {
+        console.warn('Token usage will not be reported to Upstash Kafka');
+      }
       this.baseURL = this.client.baseURL;
     }
 
@@ -162,6 +179,9 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
           {
             ...postPayload,
             ...(chatCompletion?.noUserId ? {} : { user: options?.user }),
+            stream_options: {
+              include_usage: true,
+            },
           },
           {
             // https://github.com/lobehub/lobe-chat/pull/318
@@ -177,9 +197,12 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
             debugStream(useForDebug.toReadableStream()).catch(console.error);
           }
 
-          return StreamingResponse(OpenAIStream(prod, options?.callback), {
-            headers: options?.headers,
-          });
+          return StreamingResponse(
+            OpenAIStream(prod, options?.callback, options?.user, this.kafka_producer),
+            {
+              headers: options?.headers,
+            },
+          );
         }
 
         if (debug?.chatCompletion?.()) {
@@ -188,9 +211,12 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
 
         const stream = transformResponseToStream(response as unknown as OpenAI.ChatCompletion);
 
-        return StreamingResponse(OpenAIStream(stream, options?.callback), {
-          headers: options?.headers,
-        });
+        return StreamingResponse(
+          OpenAIStream(stream, options?.callback, options?.user, this.kafka_producer),
+          {
+            headers: options?.headers,
+          },
+        );
       } catch (error) {
         throw this.handleError(error);
       }
@@ -290,6 +316,15 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
         errorType: RuntimeError || ErrorType.bizError,
         provider: provider as any,
       });
+    }
+
+    private isKafkaConfigured(): boolean {
+      return (
+        ENV_VAR_TOKEN_STATS_KAFKA_REST_URL in process.env &&
+        ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME in process.env &&
+        ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD in process.env &&
+        ENV_VAR_TOKEN_STATS_KAFKA_TOPIC in process.env
+      );
     }
   };
 };
