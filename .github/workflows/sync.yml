@@ -33,6 +33,8 @@ jobs:
           upstream_sync_branch: main
           target_sync_branch: main
           target_repo_token: ${{ secrets.GITHUB_TOKEN }} # automatically generated, no need to set
+          git_config_pull_rebase: true
+          target_branch_push_args: --force
           test_mode: false
 
       - name: Sync check
