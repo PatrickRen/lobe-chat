@@ -6,7 +6,6 @@ import type { Stream } from 'openai/streaming';
 import { ChatMessageError } from '@/types/message';
 
 import { ChatStreamCallbacks } from '../../types';
-import { ENV_VAR_TOKEN_STATS_KAFKA_TOPIC } from '../openaiCompatibleFactory';
 import {
   StreamProtocolChunk,
   StreamProtocolToolCallChunk,
@@ -15,6 +14,8 @@ import {
   createSSEProtocolTransformer,
   generateToolCallId,
 } from './protocol';
+
+export const ENV_VAR_TOKEN_STATS_KAFKA_TOPIC = 'TOKEN_USAGE_TOPIC';
 
 export const transformOpenAIStream = (chunk: OpenAI.ChatCompletionChunk): StreamProtocolChunk => {
   // maybe need another structure to add support for multiple choices
@@ -91,12 +92,12 @@ export const transformOpenAIStream = (chunk: OpenAI.ChatCompletionChunk): Stream
 
 function reportTokenUsageToKafka(user?: string, kafka_producer?: Producer) {
   return new TransformStream({
-    transform: (chunk, controller) => {
+    transform: (chunk: OpenAI.ChatCompletionChunk, controller) => {
       controller.enqueue(chunk);
       if (chunk.usage !== null && kafka_producer !== null) {
         const kafka_topic = process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC];
-        const kafka_message = { usage: chunk.usage, user: user };
-        console.log(`Producing usage message ${kafka_message} to Kafka topic ${kafka_topic}`);
+        const kafka_message = { model: chunk.model, usage: chunk.usage, user: user };
+        console.debug(`Producing usage message ${kafka_message} to Kafka topic ${kafka_topic}`);
         kafka_producer?.produce(kafka_topic!, kafka_message).catch(console.error);
       }
     },

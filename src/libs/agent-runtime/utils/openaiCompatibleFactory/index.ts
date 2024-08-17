@@ -20,7 +20,7 @@ import { debugResponse, debugStream } from '../debugStream';
 import { desensitizeUrl } from '../desensitizeUrl';
 import { handleOpenAIError } from '../handleOpenAIError';
 import { StreamingResponse } from '../response';
-import { OpenAIStream } from '../streams';
+import { ENV_VAR_TOKEN_STATS_KAFKA_TOPIC, OpenAIStream } from '../streams';
 
 // the model contains the following keywords is not a chat model, so we should filter them out
 const CHAT_MODELS_BLOCK_LIST = [
@@ -38,7 +38,6 @@ const CHAT_MODELS_BLOCK_LIST = [
 const ENV_VAR_TOKEN_STATS_KAFKA_REST_URL = 'UPSTASH_KAFKA_REST_URL';
 const ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME = 'UPSTASH_KAFKA_REST_USERNAME';
 const ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD = 'UPSTASH_KAFKA_REST_PASSWORD';
-export const ENV_VAR_TOKEN_STATS_KAFKA_TOPIC = 'TOKEN_USAGE_TOPIC';
 
 type ConstructorOptions<T extends Record<string, any> = any> = ClientOptions & T;
 
@@ -155,38 +154,13 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
       this.client = new OpenAI({ apiKey, baseURL, ...constructorOptions, ...res });
       if (this.isKafkaConfigured()) {
         console.log('Token usage will be reported to Upstash Kafka');
-        console.log(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_URL}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]}`,
-        );
-        console.log(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]}`,
-        );
-        console.log(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]}`,
-        );
-        console.log(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC]}`,
-        );
         this.kafka_producer = new Kafka({
           password: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]!,
           url: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]!,
           username: process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]!,
         }).producer();
-      } else {
-        console.warn('Token usage will not be reported to Upstash Kafka');
-        console.warn(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_URL}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]}`,
-        );
-        console.warn(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]}`,
-        );
-        console.warn(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]}`,
-        );
-        console.warn(
-          `${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC]}`,
-        );
       }
+      this.debugLogKafkaConfigurations();
       this.baseURL = this.client.baseURL;
     }
 
@@ -348,6 +322,21 @@ export const LobeOpenAICompatibleFactory = <T extends Record<string, any> = any>
         ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME in process.env &&
         ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD in process.env &&
         ENV_VAR_TOKEN_STATS_KAFKA_TOPIC in process.env
+      );
+    }
+
+    private debugLogKafkaConfigurations() {
+      console.debug(
+        `${ENV_VAR_TOKEN_STATS_KAFKA_REST_URL}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_URL]}`,
+      );
+      console.debug(
+        `${ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_USERNAME]}`,
+      );
+      console.debug(
+        `${ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_REST_PASSWORD]}`,
+      );
+      console.debug(
+        `${ENV_VAR_TOKEN_STATS_KAFKA_TOPIC}=${process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC]}`,
       );
     }
   };
