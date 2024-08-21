@@ -97,8 +97,17 @@ function reportTokenUsageToKafka(user?: string, kafka_producer?: Producer) {
       if (chunk.usage !== null && kafka_producer !== null) {
         const kafka_topic = process.env[ENV_VAR_TOKEN_STATS_KAFKA_TOPIC];
         const kafka_message = { model: chunk.model, usage: chunk.usage, user: user };
-        console.debug(`Producing usage message ${kafka_message} to Kafka topic ${kafka_topic}`);
-        kafka_producer?.produce(kafka_topic!, kafka_message).catch(console.error);
+        console.debug(
+          `Producing usage message ${JSON.stringify(kafka_message)} to Kafka topic ${kafka_topic}`,
+        );
+        kafka_producer
+          ?.produce(kafka_topic!, kafka_message)
+          .then((response) => {
+            console.debug(
+              `Message has been produced to Kafka. topic="${response.topic}", partition=${response.partition}, offset=${response.offset}, timestamp=${response.timestamp}`,
+            );
+          })
+          .catch(console.error);
       }
     },
   });
