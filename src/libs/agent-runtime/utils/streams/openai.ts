@@ -1,4 +1,5 @@
 import { Producer } from '@upstash/kafka';
+import { waitUntil } from '@vercel/functions';
 import { readableFromAsyncIterable } from 'ai';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -100,14 +101,16 @@ function reportTokenUsageToKafka(user?: string, kafka_producer?: Producer) {
         console.debug(
           `Producing usage message ${JSON.stringify(kafka_message)} to Kafka topic ${kafka_topic}`,
         );
-        kafka_producer
-          ?.produce(kafka_topic!, kafka_message)
-          .then((response) => {
-            console.debug(
-              `Message has been produced to Kafka. topic="${response.topic}", partition=${response.partition}, offset=${response.offset}, timestamp=${response.timestamp}`,
-            );
-          })
-          .catch(console.error);
+        waitUntil(
+          kafka_producer
+            ?.produce(kafka_topic!, kafka_message)
+            .then((response) => {
+              console.debug(
+                `Message has been produced to Kafka. topic="${response.topic}", partition=${response.partition}, offset=${response.offset}, timestamp=${response.timestamp}`,
+              );
+            })
+            .catch(console.error) ?? Promise.resolve(),
+        );
       }
     },
   });
